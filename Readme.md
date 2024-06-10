@@ -5,7 +5,7 @@ Este proyecto utiliza la detección de objetos en tiempo real para seguir un obj
 ## Requisitos
 
 1. **Python 3.8 o superior**: Asegúrate de tener Python 3.8 o superior instalado en tu sistema.
-2. **Git**: Para clonar el repositorio YOLOv5.
+2. **Git**: Para clonar el repositorio del Proyecto de Física.
 
 ## Instalación
 
@@ -13,5 +13,14 @@ Este proyecto utiliza la detección de objetos en tiempo real para seguir un obj
    ```bash
    git clone https://github.com/blostdevx/proyectofisica/
    cd proyectofisica
+2. **Actualizar pip**
+   ```bash
+   pip install --upgrade pip
+3. **Instalar dependencias**
+   ```bash
+   pip install -r requirements.txt
 
-   
+## Inciar el programa
+
+```bash
+python index.py

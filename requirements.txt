@@ -1,0 +1,7 @@
+torch
+opencv-python
+opencv-python-headless
+matplotlib
+scikit-learn
+numpy
+git+https://github.com/ultralytics/yolov5.git

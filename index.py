@@ -2,6 +2,7 @@ import torch
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
+from sklearn.linear_model import LinearRegression
 
 # Cargar el modelo YOLOv5
 model = torch.hub.load('ultralytics/yolov5', 'yolov5s')
@@ -20,6 +21,10 @@ roi = (0, 0, 0, 0)
 puntos = []
 fps = cap.get(cv2.CAP_PROP_FPS)
 
+# Variables para aprendizaje
+historial_predicciones = []
+errores = []
+
 # Callback para el evento de mouse
 def seleccionar_objeto(event, x, y, flags, param):
     global seleccionando_objeto, roi, objeto_seleccionado
@@ -36,6 +41,20 @@ def seleccionar_objeto(event, x, y, flags, param):
 # Ventana de video y callback del mouse
 cv2.namedWindow('frame')
 cv2.setMouseCallback('frame', seleccionar_objeto)
+
+# Función para calcular velocidad y aceleración
+def calcular_mrua(puntos, fps):
+    velocidades = []
+    aceleraciones = []
+    for i in range(1, len(puntos)):
+        distancia = np.linalg.norm(np.array(puntos[i]) - np.array(puntos[i - 1]))
+        tiempo = 1 / fps
+        velocidad = distancia / tiempo
+        velocidades.append(velocidad)
+        if i > 1:
+            aceleracion = (velocidades[-1] - velocidades[-2]) / tiempo
+            aceleraciones.append(aceleracion)
+    return velocidades, aceleraciones
 
 # Procesar cada cuadro del video
 while cap.isOpened():
@@ -61,6 +80,18 @@ while cap.isOpened():
                 for i in range(1, len(puntos)):
                     cv2.line(frame, puntos[i - 1], puntos[i], (0, 255, 0), 2)
 
+                # Predecir punto de caída
+                if len(puntos) > 5:
+                    x = np.array([p[0] for p in puntos]).reshape(-1, 1)
+                    y = np.array([p[1] for p in puntos])
+                    modelo = LinearRegression().fit(x, y)
+                    x_pred = np.array([frame.shape[1]]).reshape(-1, 1)
+                    y_pred = modelo.predict(x_pred)
+                    cv2.circle(frame, (frame.shape[1], int(y_pred)), 10, (0, 0, 255), -1)
+
+                    # Guardar predicción en historial
+                    historial_predicciones.append((frame.shape[1], int(y_pred)))
+
     elif seleccionando_objeto:
         x1, y1, x2, y2 = roi
         cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 0, 0), 2)
@@ -73,16 +104,7 @@ cap.release()
 cv2.destroyAllWindows()
 
 if puntos:
-    def calcular_velocidad(puntos, fps):
-        velocidades = []
-        for i in range(1, len(puntos)):
-            distancia = np.linalg.norm(np.array(puntos[i]) - np.array(puntos[i - 1]))
-            tiempo = 1 / fps
-            velocidad = distancia / tiempo
-            velocidades.append(velocidad)
-        return velocidades
-
-    velocidades = calcular_velocidad(puntos, fps)
+    velocidades, aceleraciones = calcular_mrua(puntos, fps)
 
     x = [p[0] for p in puntos]
     y = [p[1] for p in puntos]
@@ -94,16 +116,22 @@ if puntos:
     caida = y[-1] - y[0]
 
     plt.figure()
-    plt.subplot(2, 1, 1)
+    plt.subplot(3, 1, 1)
     plt.plot(x, y, label='Trayectoria')
     plt.xlabel('X')
     plt.ylabel('Y')
     plt.legend()
 
-    plt.subplot(2, 1, 2)
+    plt.subplot(3, 1, 2)
     plt.plot(velocidades, label='Velocidad')
     plt.xlabel('Tiempo (frames)')
     plt.ylabel('Velocidad (pixeles/segundo)')
+    plt.legend()
+
+    plt.subplot(3, 1, 3)
+    plt.plot(aceleraciones, label='Aceleración')
+    plt.xlabel('Tiempo (frames)')
+    plt.ylabel('Aceleración (pixeles/segundo^2)')
     plt.legend()
 
     plt.tight_layout()
@@ -111,3 +139,11 @@ if puntos:
 
     print(f'Punto Cero: {punto_cero}')
     print(f'Caída: {caida}')
+
+    # Aprendizaje basado en errores
+    respuesta_correcta = input("¿El cálculo fue correcto? (s/n): ")
+    if respuesta_correcta.lower() == 'n':
+        x_real = int(input("Ingrese la coordenada X real de la caída: "))
+        y_real = int(input("Ingrese la coordenada Y real de la caída: "))
+        errores.append((historial_predicciones[-1], (x_real, y_real)))
+        print("Error registrado para aprendizaje futuro.")
